@@ -1,0 +1,154 @@
+
+
+
+nohup psql -d citus -c "INSERT INTO mepstg.stg_mep_claim_10r_new SELECT * FROM mepstg.stg_mep_claim_10r;" > insert_log.txt 2>&1 &
+
+pgbackrest --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --stanza=wgroup2 --log-level-console=debug check >/tmp/pgbackrest-wgroup2-debug.out 2>&1
+
+/opt/app/python/bin/patronictl -c /opt/app/patroni/patroni.yml edit-config --group 1
+
+/opt/app/python/bin/patronictl -c /opt/app/patroni/patroni.yml restart pgqa1 
+/opt/app/python/bin/patronictl -c /opt/app/patroni/patroni.yml restart pgproddr1 pv1medpg0c1
+
+
+/opt/app/python/bin/patronictl -c /opt/app/patroni/patroni.yml list
+
+
+
+ test ! -f /opt/backup/pgqa1/group0/wal_archive/%f && /usr/bin/cp %p /opt/backup/pgqa1/group0/wal_archive/%f
+
+pgbackrest --stanza=pgqa1 archive-push %p
+
+
+/opt/app/pgbackrest-2.49/bin/pgbackrest --cmd-ssh=/usr/bin/ssh --stanza=pgqa1 --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf archive-push %p
+/opt/app/pgbackrest-2.49/bin/pgbackrest --cmd-ssh=/usr/bin/ssh --stanza=wgroup1 --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf archive-push %p
+/opt/app/pgbackrest-2.49/bin/pgbackrest --cmd-ssh=/usr/bin/ssh --stanza=wgroup2 --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf archive-push %p
+
+psql -h pv2medpg1c2 -U postgres -d citus  -X -f gather.sql > out_pv2medpg1c2.tsv
+
+
+
+ALTER SYSTEM SET archive_command = '/opt/app/pgbackrest-2.49/bin/pgbackrest --stanza=pgqa1 archive-push %p';
+
+
+
+/opt/app/pgbackrest-2.49/bin/pgbackrest --stanza=pgqa1 \
+  --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf \
+  --log-level-console=info archive-push pg_wal/0000001B0000001C000000EE >/tmp/pgbackrest-info.out 2>&1
+
+/opt/app/pgbackrest-2.49/bin/pgbackrest --stanza=pgqa1 \
+  --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf \
+  --log-level-console=debug archive-push pg_wal/0000001B0000001C000000EC >/tmp/pgbackrest-debug.out 2>&1
+
+
+/opt/app/pgbackrest-2.49/bin/pgbackrest --stanza=wgroup2 \
+  --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf \
+  --log-level-console=info archive-push pg_wal/0000000B00000003000000BE >/tmp/pgbackrest-wgroup2--info.out 2>&1
+
+
+
+
+ls -lrth|head -100
+mv 00000027000007D* /opt/backup/pgproddr1/group0/wal_archive
+
+
+
+000000270000076A00000013
+
+
+
+/opt/app/postgresql-15.1/bin/psql -h 10.13.4.245 -U postgrespwd
+
+
+SELECT * FROM citus_tables ;
+
+
+
+pgbackrest backup --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --stanza=pgqa1 --log-level-console=info --type=full
+
+
+
+
+
+pg3-host=qv1medpgw1
+pg3-host-user=svcpostgres
+pg3-port=5432
+pg3-path=/opt/app/postgres-data/data
+pg4-host=qv1medpgw2
+pg4-host-user=svcpostgres
+pg4-port=5432
+pg4-path=/opt/app/postgres-data/data
+pg5-host=qv1medpgw3
+pg5-host-user=svcpostgres
+pg5-port=5432
+pg5-path=/opt/app/postgres-data/data
+pg6-host=qv1medpgw4
+pg6-host-user=svcpostgres
+pg6-port=5432
+pg6-path=/opt/app/postgres-data/data
+
+
+export PATH=/opt/app/postgresql/bin:$PATH
+source /opt/app/localhome/svcpostgres/pg_env.sh
+export PGHOST=localhost
+export PATH=/opt/app/postgresql/bin:$PATH
+
+wgroup1
+wgroup2
+
+
+
+[svcpostgres@pv2medpgbr1 ~]$ pgbackrest --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --stanza=pgqa1 --log-level-console=info check
+2024-01-04 20:52:14.286 P00   INFO: check command begin 2.49: --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --exec-id=1993410-1f98d8b8 --log-level-console=info --log-level-file=info --log-path=/opt/backup/log/pgbackrest --pg1-host=qv1medpgc1 --pg2-host=qv1medpgc2 --pg1-host-user=svcpostgres --pg2-host-user=svcpostgres --pg1-path=/opt/app/postgres-data/data --pg2-path=/opt/app/postgres-data/data --pg1-port=5432 --pg2-port=5432 --repo1-path=/opt/backup/pgbackrest --stanza=pgqa1
+2024-01-04 20:52:16.506 P00   INFO: check repo1 (standby)
+2024-01-04 20:52:16.510 P00   INFO: switch wal not performed because this is a standby
+2024-01-04 20:52:16.521 P00   INFO: check repo1 configuration (primary)
+2024-01-04 20:52:16.751 P00   INFO: check repo1 archive for WAL (primary)
+2024-01-04 20:52:17.357 P00   INFO: WAL segment 0000001D0000001D00000069 successfully archived to '/opt/backup/pgbackrest/archive/pgqa1/15-1/0000001D0000001D/0000001D0000001D00000069-9b6e68458ff7c1188130272106137902ee5ea6b1.gz' on repo1
+2024-01-04 20:52:17.576 P00   INFO: check command end: completed successfully (3290ms)
+
+[svcpostgres@pv2medpgbr1 15-1]$ pgbackrest backup --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --stanza=pgqa1 --log-level-console=info --type=full
+2024-01-04 20:58:06.820 P00   INFO: backup command begin 2.49: --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --exec-id=1993655-3ef4b376 --log-level-console=info --log-level-file=info --log-path=/opt/backup/log/pgbackrest --pg1-host=qv1medpgc1 --pg2-host=qv1medpgc2 --pg1-host-user=svcpostgres --pg2-host-user=svcpostgres --pg1-path=/opt/app/postgres-data/data --pg2-path=/opt/app/postgres-data/data --pg1-port=5432 --pg2-port=5432 --process-max=4 --repo1-path=/opt/backup/pgbackrest --repo1-retention-archive-type=full --repo1-retention-full=2 --stanza=pgqa1 --start-fast --type=full
+2024-01-04 20:58:09.203 P00   INFO: execute non-exclusive backup start: backup begins after the requested immediate checkpoint completes
+2024-01-04 20:58:09.797 P00   INFO: backup start archive = 0000001D0000001D0000006B, lsn = 1D/6B000028
+2024-01-04 20:58:09.797 P00   INFO: check archive for prior segment 0000001D0000001D0000006A
+2024-01-04 21:03:09.518 P00   INFO: execute non-exclusive backup stop and wait for all WAL segments to archive
+2024-01-04 21:03:09.747 P00   INFO: backup stop archive = 0000001D0000001D0000006B, lsn = 1D/6B000F98
+2024-01-04 21:03:09.763 P00   INFO: check archive for segment(s) 0000001D0000001D0000006B:0000001D0000001D0000006B
+2024-01-04 21:03:10.517 P00   INFO: new backup label = 20240104-205809F
+2024-01-04 21:03:10.586 P00   INFO: full backup size = 15.8GB, file total = 2206
+2024-01-04 21:03:10.586 P00   INFO: backup command end: completed successfully (303768ms)
+2024-01-04 21:03:10.590 P00   INFO: expire command begin 2.49: --config=/opt/app/pgbackrest-data/pgbackrest/pgbackrest.conf --exec-id=1993655-3ef4b376 --log-level-console=info --log-level-file=info --log-path=/opt/backup/log/pgbackrest --repo1-path=/opt/backup/pgbackrest --repo1-retention-archive-type=full --repo1-retention-full=2 --stanza=pgqa1
+2024-01-04 21:03:10.696 P00   INFO: expire command end: completed successfully (110ms)
+
+
+
+CREATE TABLE shard.t_shard (
+id          serial, 
+shard_key   int, 
+n           int, 
+placeholder char(100) DEFAULT 'a');
+
+SELECT create_distributed_table('shard.t_shard', 'shard_key');
+
+INSERT INTO shard.t_shard (shard_key, n) 
+SELECT  id % 16, random()*100000 
+FROM        generate_series(1, 3000000) AS id;
+
+
+SELECT * FROM citus_tables;
+
+explain analyze SELECT count(*) FROM shard.t_shard;
+explain (analyze, buffers, timing) SELECT count(*) FROM shard.t_shard;
+
+PostgreSQL will distribute the query for us and send it to all shards. Note that PostgreSQL will not show the operations sent to each shard but just show things for one. However, those shards are created equal so we don’t care much.
+
+If we look at a specific value in the shard_key column, we’ll see that only one shard is addressed:
+
+Citus will turn on the sharding machinery, query things in parallel, and return a result by going through ALL the data. In reality, this is really bad and throwing more hardware at the problem is going to make things even worse
+
+
+postgresql-2024-06-19_060653.log
+
+
+
