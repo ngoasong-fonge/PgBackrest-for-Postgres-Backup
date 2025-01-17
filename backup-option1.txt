@@ -3,13 +3,16 @@
 https://pgbackrest.org/configuration.html#section-general/option-delta
 
 This is especially useful in the case of a restore, because it means that you don't have to actually work with an empty datadir (and copy the full extent of files in it). If you don't specify it, pgBackRest will complain about the non-empty datadir and refuse to work:
+
 shell> pgbackrest restore --stanza=pg0app --log-level-console=info
 2024-01-05 01:56:22.057 P00   INFO: restore command begin 2.49: --exec-id=8579-006b62e4 --log-level-console=info --pg1-path=/var/lib/pgsql/16/data --repo1-path=/var/lib/pgbackrest --stanza=pg0app
 2024-01-05 01:56:22.067 P00   INFO: repo1: restore backup set 20240105-015040F_20240105-015321I, recovery will start at 2024-01-05 01:53:21
 ERROR: [040]: unable to restore to path '/var/lib/pgsql/16/data' because it contains files
        HINT: try using --delta if this is what you intended.
 2024-01-05 01:56:22.068 P00   INFO: restore command end: aborted with exception [040]
+
 When we add it, it works, and will only add/delete the files that don't match in checksum:
+
 pgbackrest restore --delta --stanza=pg0app --log-level-console=info
 2024-01-05 01:56:46.099 P00   INFO: restore command begin 2.49: --delta --exec-id=8581-c784c9d6 --log-level-console=info --pg1-path=/var/lib/pgsql/16/data --repo1-path=/var/lib/pgbackrest --stanza=pg0app
 2024-01-05 01:56:46.109 P00   INFO: repo1: restore backup set 20240105-015040F_20240105-015321I, recovery will start at 2024-01-05 01:53:21
@@ -18,7 +21,9 @@ pgbackrest restore --delta --stanza=pg0app --log-level-console=info
 2024-01-05 01:56:46.677 P00   INFO: restore global/pg_control (performed last to ensure aborted restores cannot be started)
 2024-01-05 01:56:46.678 P00   INFO: restore size = 24.6MB, file total = 997
 2024-01-05 01:56:46.678 P00   INFO: restore command end: completed successfully (580ms)
+
 If you want a more verbose output on it, to see exactly what it is doing with each file, use the detail outputs (note that these outputs will probably be very lengthy, so I suggest to send STDOUT to a log file):
+
 shell> pgbackrest restore --delta --stanza=pg0app --log-level-console=detail
 2024-01-05 01:57:34.743 P00   INFO: restore command begin 2.49: --delta --exec-id=8598-47c94878 --log-level-console=detail --pg1-path=/var/lib/pgsql/16/data --repo1-path=/var/lib/pgbackrest --stanza=pg0app
 2024-01-05 01:57:34.753 P00   INFO: repo1: restore backup set 20240105-015040F_20240105-015321I, recovery will start at 2024-01-05 01:53:21
@@ -30,6 +35,7 @@ shell> pgbackrest restore --delta --stanza=pg0app --log-level-console=detail
 2024-01-05 01:57:34.881 P01 DETAIL: restore file /var/lib/pgsql/16/data/base/4/1255 - exists and matches backup (784KB, 6.41%) checksum dc02bd16c7b58972e21645caf0d1c19cedf61f23
 2024-01-05 01:57:34.882 P01 DETAIL: restore file /var/lib/pgsql/16/data/base/13383/1255 - exists and matches backup (784KB, 9.52%) checksum 1e17f3a8fdca0e8dd2f65e170484f43ec72a9c04
 ...
+
 If you already know that the changes between the current datadir and the datadir from the backup you want to restore were similar, then this could potentially save a lot of time for the restore procedure. Note you can also use the delta restore with point-in-time recovery procedures.
 **For the backup procedure, the delta=y argument means that instead of timestamps, pgBackRest will use the checksums to see if there were changes to the files. Generating the checksums takes time and processing power, so in this case it could be that you are better off by using timestamps (which is the default). This will all depend on dataset size and available resources, so please test this further on your end.
 
